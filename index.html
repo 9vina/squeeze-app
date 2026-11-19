@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>擠錢記帳</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="擠錢記帳">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+/* Layout: one phone-width column, one screen at a time, main action pinned to the bottom. White app by choice. */
+:root{
+  --bg:#FFFFFF; --fg:#1A1A1A; --muted:#5F5F5B; --line:#E6E6E1; --soft:#F4F4F1;
+  --save:#1D4ED8; --saveSoft:#EAF0FF; --food:#C2410C; --foodFill:#EA580C; --foodSoft:#FFF1E8;
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang TC","Noto Sans TC",system-ui,sans-serif;
+  color-scheme:light;
+}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px;-webkit-tap-highlight-color:transparent;-webkit-text-size-adjust:100%}
+*{box-sizing:border-box}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--save);outline-offset:2px}
+.app{max-width:440px;margin:0 auto;min-height:100%;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px));padding-top:calc(12px + env(safe-area-inset-top,0px));padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column}
+.screen{display:flex;flex-direction:column;gap:18px;flex:1}
+.spacer{flex:1}
+h1{margin:0;font-size:26px;line-height:1.3;font-weight:700}
+p{margin:0}
+.muted{color:var(--muted)} .small{font-size:13px} .num{font-variant-numeric:tabular-nums}
+.save{color:var(--save)} .food{color:var(--food)}
+.top{display:flex;justify-content:space-between;align-items:center;min-height:44px}
+.link{border:0;background:none;padding:0 4px 0 0;height:44px;display:inline-flex;align-items:center;gap:4px;font-size:15px;color:var(--muted)}
+.iconbtn{border:0;background:none;width:44px;height:44px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);border-radius:12px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:56px;border-radius:16px;border:0;background:var(--fg);color:#fff;font-size:17px;font-weight:600}
+.btn:disabled{background:#B9B9B4}
+.btn.ghost{background:var(--bg);color:var(--fg);border:1px solid #D4D4CF;height:52px;font-size:16px}
+.btn.text{background:none;color:var(--muted);height:48px;font-size:15px;font-weight:500}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label,.label{font-size:13px;color:var(--muted)}
+.input{display:flex;align-items:center;gap:6px;height:52px;padding:0 16px;border-radius:14px;background:var(--soft)}
+.input input{flex:1;min-width:0;border:0;background:transparent;font-size:17px;font-weight:600;outline:none}
+.input .cur{font-weight:600;color:var(--muted)}
+.input.big{height:56px}.input.big input{font-size:24px;font-weight:700}
+.rows{display:flex;flex-direction:column}
+.row{display:flex;align-items:center;gap:8px;min-height:52px;border-bottom:1px solid var(--line)}
+.row input{border:0;background:transparent;outline:none;font-size:16px;min-width:0}
+.row .name{flex:1}
+.row .amt{width:96px;text-align:right;font-weight:600}
+.row .minus{color:var(--muted);font-weight:600}
+.add{border:0;background:none;padding:0;height:48px;display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:600;color:var(--save);align-self:flex-start}
+.card{display:flex;flex-direction:column;gap:12px;padding:16px;border-radius:16px;border:1px solid var(--line)}
+.panel{display:flex;flex-direction:column;gap:10px;padding:16px;border-radius:18px;background:var(--soft)}
+.between{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.hr{height:1px;background:var(--line)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{height:44px;padding:0 16px;border-radius:22px;border:1px solid #D4D4CF;background:var(--bg);font-size:14px}
+.chip[aria-pressed="true"]{background:var(--fg);border-color:var(--fg);color:#fff;font-weight:600}
+.split{display:flex;gap:12px}
+.split>div{flex:1;display:flex;flex-direction:column;gap:4px}
+.split .vr{flex:none;width:1px;background:var(--line)}
+.bigval{font-size:26px;font-weight:700}
+.note{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;border-radius:14px;background:var(--soft);font-size:13px;line-height:1.55;color:#3E3E3B}
+.note.warn{background:var(--foodSoft);color:#7A2A08}
+.bar{height:8px;border-radius:4px;background:#E1E1DC;overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:4px;background:var(--save)}
+.inline{border:0;background:none;padding:0;color:var(--save);font-weight:600;font-size:inherit}
+/* calendar */
+.monthbar{display:flex;align-items:center;justify-content:space-between}
+.monthbar h2{margin:0;font-size:20px;font-weight:700}
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.wd{text-align:center;font-size:12px;color:var(--muted);padding-bottom:2px}
+.cell{position:relative;height:58px;border-radius:12px;border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:0}
+.cell .d{font-size:12px;color:#4A4A47}
+.cell .a{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.cell.has{background:var(--soft)}
+.cell.today{border:2px solid var(--fg)}
+.cell.today .d{font-weight:700;color:var(--fg)}
+.cell.future .d{color:#767672}
+.cell .dot{position:absolute;top:6px;right:6px;width:6px;height:6px;border-radius:3px;background:var(--muted)}
+.cell .plus{font-size:16px;line-height:1;color:var(--fg)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12px;color:#4A4A47}
+.legend span{display:flex;align-items:center;gap:6px}
+.sw{width:10px;height:10px;border-radius:3px;display:inline-block}
+/* dial */
+.dialwrap{display:flex;justify-content:center;padding-top:6px}
+.dial{position:relative;width:320px;height:320px;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.ring{position:absolute;left:55px;top:55px;width:210px;height:210px;border-radius:50%;border:16px solid var(--line);transition:border-color .12s}
+.cat{position:absolute;border:0;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;width:96px;height:52px;border-radius:12px;padding:0}
+.cat b{font-size:14px}
+.cat span{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.cat span.empty{font-weight:400;font-size:13px;color:var(--muted)}
+.cat.hot{background:var(--saveSoft)}
+.cat.up{left:112px;top:0}.cat.down{left:112px;bottom:0}
+.cat.left{left:-14px;top:134px}.cat.right{right:-14px;top:134px}
+.cat.up b{color:var(--food)}
+.chev{position:absolute;color:#A3A39E;pointer-events:none}
+.core{position:absolute;left:108px;top:108px;width:104px;height:104px;border-radius:50%;border:0;background:var(--fg);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;touch-action:none;transition:transform .12s}
+.core b{font-size:17px}
+.core small{font-size:11px;color:#D6D6D2}
+.core.pressed{transform:scale(.94)}
+/* keypad */
+.amount{display:flex;flex-direction:column;align-items:center;gap:10px;padding-top:20px}
+.catchip{display:flex;align-items:center;gap:8px;height:32px;padding:0 14px;border-radius:16px;background:var(--foodSoft);color:var(--food);font-size:14px;font-weight:700}
+.catchip.other{background:var(--soft);color:var(--fg)}
+.amountval{font-size:60px;font-weight:700;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.keys{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.key{height:60px;border:0;border-radius:14px;background:var(--soft);font-size:24px;font-weight:500}
+.key:active{background:#E6E6E1}
+/* done */
+.hero{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center}
+.check{width:96px;height:96px;border-radius:50%;background:var(--save);display:flex;align-items:center;justify-content:center;animation:pop .5s ease-out}
+@keyframes pop{0%{transform:scale(.6)}70%{transform:scale(1.08)}100%{transform:scale(1)}}
+.stat2{display:flex;width:100%;gap:10px}
+.stat2>div{flex:1;display:flex;flex-direction:column;gap:4px;padding:14px;border-radius:14px;background:var(--soft);text-align:left}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:#fff;padding:12px 18px;border-radius:14px;font-size:14px;max-width:calc(100% - 40px);z-index:30}
+.hapt{position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none}
+textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:12px;padding:10px;font:12px ui-monospace,Menlo,monospace}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app" id="app"></div>
+<div class="toast" id="toast" hidden></div>
+<label class="hapt" id="hapt" aria-hidden="true"><input type="checkbox" switch tabindex="-1"></label>
+<input type="file" id="importFile" accept="application/json,.json" hidden>
+
+<script>
+(function(){
+const DAY = 86400000;
+const pad = n => String(n).padStart(2,'0');
+const ymd = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const parse = s => { const [a,b,c] = s.split('-').map(Number); return new Date(a,b-1,c); };
+const today = () => ymd(new Date());
+const addDays = (s,n) => { const d = parse(s); d.setDate(d.getDate()+n); return ymd(d); };
+const diffDays = (a,b) => Math.round((parse(b)-parse(a))/DAY);
+const money = n => (n<0?'−$':'$')+Math.abs(Math.round(n)).toLocaleString('en-US');
+const num = v => { const n = Number(String(v==null?'':v).replace(/[^\d.]/g,'')); return isFinite(n)?n:0; };
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const WD = ['日','一','二','三','四','五','六'];
+const fmtDate = s => { const d = parse(s); return (d.getMonth()+1)+' 月 '+d.getDate()+' 日 週'+WD[d.getDay()]; };
+const short = s => { const d = parse(s); return (d.getMonth()+1)+'/'+d.getDate(); };
+const CATS = { food:{name:'餐飲',dir:'up'}, transport:{name:'交通',dir:'right'}, needs:{name:'生活必需',dir:'down'}, wants:{name:'想要',dir:'left'} };
+const DIR2CAT = { up:'food', right:'transport', down:'needs', left:'wants' };
+const ICON = {
+  back:'<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.5 4.5 7 10l5.5 5.5"/></svg>',
+  next:'<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 4.5 13 10l-5.5 5.5"/></svg>',
+  plus:'<svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M10 4v12M4 10h12"/></svg>',
+  x:'<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 5l10 10M15 5 5 15"/></svg>',
+  gear:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg>',
+  info:'<svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true" style="flex:none;margin-top:1px"><circle cx="10" cy="10" r="8"/><path d="M10 9v5M10 6.2v.1"/></svg>',
+  chev:{up:'M3 10l5-5 5 5',down:'M3 6l5 5 5-5',left:'M10 3l-5 5 5 5',right:'M6 3l5 5-5 5'}
+};
+
+/* ---------- state: kept on this phone ---------- */
+const LS = 'squeeze-v1-app';
+const blank = () => ({ v:1, setup:{ income:'', deductions:[{name:'房租',amount:''}], foodMonthly:'' }, goal:null, entries:{}, history:[] });
+let S;
+try { S = JSON.parse(localStorage.getItem(LS)) || blank(); } catch(e) { S = blank(); }
+if (!S.entries) S.entries = {}; if (!S.history) S.history = []; if (!S.setup) S.setup = blank().setup;
+const persist = () => { try { localStorage.setItem(LS, JSON.stringify(S)); } catch(e){ toast('存檔失敗，手機空間可能不足'); } };
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+const ui = { view: S.goal ? 'home' : 'setup1', date:null, draft:null, cat:null, amount:'', month:null, gd:null, backup:false };
+
+/* ---------- haptics ---------- */
+const hapt = document.getElementById('hapt');
+function haptic(kind){
+  try {
+    if (navigator.vibrate) { navigator.vibrate(kind === 'long' ? [40,60,160] : 12); return; }
+    hapt.click();
+    if (kind === 'long') { setTimeout(()=>hapt.click(), 110); setTimeout(()=>hapt.click(), 220); }
+  } catch(e){}
+}
+let toastTimer = null;
+function toast(msg){ const t = document.getElementById('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(()=>{ t.hidden = true; }, 2600); }
+
+/* ---------- money math ---------- */
+const usualFromSetup = () => Math.round(num(S.setup.foodMonthly)/30) || 0;
+const totalDeduct = () => S.setup.deductions.reduce((a,d)=>a+num(d.amount),0);
+function plan(g){ const days = Math.max(diffDays(g.start, g.deadline) + 1, 1); const squeeze = Math.ceil(g.amount / days); return { days, squeeze, budget: g.usual - squeeze }; }
+function squeezedOf(g){ let t = 0; for (const [d,e] of Object.entries(S.entries)) if (d >= g.start && d <= g.deadline) t += g.usual - (e.food||0); return t; }
+const loggedIn = g => Object.keys(S.entries).filter(d => d >= g.start && d <= g.deadline).length;
+function outlook(g){
+  const sq = squeezedOf(g), need = g.amount - sq, t = today();
+  let from = S.entries[t] ? addDays(t,1) : t; if (from < g.start) from = g.start;
+  const left = diffDays(from, g.deadline) + 1;
+  const perDay = left > 0 ? Math.ceil(Math.max(need,0)/left) : 0;
+  return { sq, need, left, perDay, budget: g.usual - perDay, toDeadline: diffDays(t, g.deadline) };
+}
+function budgetFor(date){ const g = S.goal; if (g && date >= g.start && date <= g.deadline) return g.budget; return g ? g.usual : usualFromSetup(); }
+function todayBudget(date){
+  const g = S.goal;
+  if (g && !g.done && date === today() && date >= g.start && date <= g.deadline && !S.entries[date]) return outlook(g).budget;
+  return budgetFor(date);
+}
+
+/* ---------- views ---------- */
+function vSetup1(){
+  const s = S.setup;
+  const rows = s.deductions.map((d,i)=>`
+    <div class="row">
+      <input class="name" id="dn${i}" aria-label="扣除項目名稱" value="${esc(d.name)}" placeholder="項目名稱" data-in="dname" data-i="${i}">
+      <span class="minus">−$</span>
+      <input class="amt num" id="da${i}" aria-label="${esc(d.name||'項目')}金額" inputmode="numeric" value="${esc(d.amount)}" placeholder="0" data-in="damount" data-i="${i}">
+      <button class="iconbtn" data-act="delrow" data-i="${i}" aria-label="刪除這一項">${ICON.x}</button>
+    </div>`).join('');
+  const backup = S.goal ? `<div class="card"><p style="font-weight:600">備份資料</p>
+      <p class="small muted">資料只存在這支手機。換手機或刪掉 app 之前，先匯出一份備份。</p>
+      <div class="split"><button class="btn ghost" style="height:48px" data-act="export">匯出備份</button><button class="btn ghost" style="height:48px" data-act="import">匯入備份</button></div>
+      ${ui.backup ? `<textarea id="backupText" aria-label="備份內容" readonly>${esc(JSON.stringify(S))}</textarea><p class="small muted">複製上面的文字存到備忘錄，就是你的備份。</p>` : ''}</div>` : '';
+  return `<div class="screen">
+    <div class="top">${S.goal ? `<button class="link" data-act="home">${ICON.back}返回</button>` : `<span class="muted small">第 1 步，共 2 步</span>`}<span></span></div>
+    <h1>先算算你每個月<br>有多少錢可以用</h1>
+    <div class="field"><label for="income">每月收入</label>
+      <div class="input big"><span class="cur">$</span><input id="income" inputmode="numeric" placeholder="例如 50000" value="${esc(s.income)}" data-in="income"></div></div>
+    <div class="rows"><span class="label">每月固定支出（扣掉）</span>${rows}
+      <button class="add" data-act="addrow">${ICON.plus}新增扣除項目</button></div>
+    <div class="card">
+      <div class="between"><span class="muted" style="font-size:14px">扣掉後每月剩下</span><span class="num" style="font-size:22px;font-weight:700" id="remain"></span></div>
+      <div class="hr"></div>
+      <div class="field"><label for="foodm">其中，每月吃飯的錢</label>
+        <div class="input"><span class="cur">$</span><input id="foodm" inputmode="numeric" placeholder="例如 15000" value="${esc(s.foodMonthly)}" data-in="foodm"></div>
+        <span class="small muted" id="perday"></span></div>
+      <div class="between"><span style="font-weight:600">可以存下</span><span class="num save" style="font-size:18px;font-weight:700" id="cansave"></span></div>
+    </div>
+    ${backup}
+    <div class="spacer"></div>
+    <button class="btn" data-act="toSetup2" id="next1">下一步：設定目標</button>
+  </div>`;
+}
+function updSetup1(){
+  const remain = num(S.setup.income) - totalDeduct(), food = num(S.setup.foodMonthly), el = id => document.getElementById(id);
+  if (!el('remain')) return;
+  el('remain').textContent = money(remain);
+  el('perday').textContent = food ? '平常大約每天 ' + money(food/30) : '填了之後，會換算成每天大約花多少';
+  el('cansave').textContent = money(remain - food);
+  el('next1').disabled = !(num(S.setup.income) > 0 && food > 0);
+}
+function nextFriday(){ const d = new Date(); const toMon = ((8 - d.getDay()) % 7) || 7; d.setDate(d.getDate() + toMon + 4); return ymd(d); }
+function presetDates(){ const t = today(); const m = new Date(); m.setMonth(m.getMonth()+1); return [['下週五', nextFriday()], ['2 週後', addDays(t,14)], ['1 個月後', ymd(m)]]; }
+function vSetup2(){
+  const g = ui.gd, editing = S.goal && !S.goal.done && !g.isNew;
+  const chips = presetDates().map(([l,d]) => `<button class="chip" data-act="preset" data-d="${d}" aria-pressed="${g.deadline===d}">${l} ${short(d)}</button>`).join('');
+  return `<div class="screen">
+    <div class="top"><button class="link" data-act="${editing ? 'home' : 'setup1'}">${ICON.back}${editing ? '返回' : '第 2 步，共 2 步'}</button><span></span></div>
+    <h1>這次想為了什麼存錢？</h1>
+    <div class="field"><label for="gname">目標</label>
+      <div class="input"><input id="gname" placeholder="例如：去泡湯" value="${esc(g.name)}" data-in="gname"></div></div>
+    <div class="field"><label for="gamt">需要多少錢</label>
+      <div class="input"><span class="cur">$</span><input id="gamt" inputmode="numeric" placeholder="例如 3500" value="${esc(g.amount)}" data-in="gamt"></div></div>
+    <div class="field"><span class="label">什麼時候要達成</span>
+      <div class="chips">${chips}</div>
+      <div class="input"><input id="gdate" type="date" aria-label="選擇日期" min="${g.start||today()}" value="${esc(g.deadline)}" data-in="gdate"></div></div>
+    <div class="field"><label for="gusual">平常一天吃東西大概花</label>
+      <div class="input"><span class="cur">$</span><input id="gusual" inputmode="numeric" value="${esc(g.usual)}" data-in="gusual"></div></div>
+    <div class="card" id="calc"></div>
+    <div class="spacer"></div>
+    <button class="btn" data-act="startGoal" id="go">${g.isNew ? '開始擠錢' : '儲存目標'}</button>
+  </div>`;
+}
+function updSetup2(){
+  const g = ui.gd, box = document.getElementById('calc'); if (!box) return;
+  const amt = num(g.amount), usual = num(g.usual), start = g.start || today();
+  const ok = amt > 0 && usual > 0 && g.deadline && g.deadline >= start && String(g.name).trim();
+  document.getElementById('go').disabled = !ok;
+  document.querySelectorAll('.chip[data-d]').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.d === g.deadline)));
+  if (!(amt > 0 && usual > 0 && g.deadline && g.deadline >= start)) { box.innerHTML = '<p class="muted small">填好金額和日期，這裡會算出每天要擠出多少、每天餐飲預算多少。</p>'; return; }
+  const p = plan({ start, deadline:g.deadline, amount:amt, usual });
+  let tip = '';
+  if (p.budget <= 0) { const need = Math.ceil(amt / Math.max(usual*0.4,1)); tip = `<div class="note warn">${ICON.info}<span>這樣每天幾乎不能吃東西。試試把期限延到 ${short(addDays(start, need-1))} 左右，或換個便宜一點的目標。</span></div>`; }
+  else if (p.budget < usual * 0.4) { const later = addDays(g.deadline, 7), p2 = plan({ start, deadline:later, amount:amt, usual }); tip = `<div class="note">${ICON.info}<span>覺得太緊？期限延到 ${short(later)}，每天餐飲預算會變成 ${money(p2.budget)}。</span></div>`; }
+  box.innerHTML = `<p class="muted" style="font-size:14px">共 ${p.days} 天，算下來</p>
+    <div class="split"><div><span class="small muted">每天要擠出</span><span class="bigval num save">${money(p.squeeze)}</span></div><div class="vr"></div>
+    <div><span class="small muted">每天餐飲預算</span><span class="bigval num food">${money(Math.max(p.budget,0))}</span></div></div>
+    <p class="small muted">平常每天吃 ${money(usual)} − 擠出 ${money(p.squeeze)} = ${money(p.budget)}</p>${tip}`;
+}
+function vHome(){
+  const g = S.goal, t = today();
+  if (!ui.month) ui.month = t.slice(0,7);
+  let top;
+  if (g && !g.done) {
+    const o = outlook(g), pct = Math.max(0, Math.min(100, o.sq / g.amount * 100));
+    let line;
+    if (o.toDeadline < 0) line = `期限已過。<button class="inline" data-act="editGoal">延長期限</button> 或 <button class="inline" data-act="newGoal">換新目標</button>`;
+    else if (o.budget <= 0) line = `剩下的天數有點不夠，可以<button class="inline" data-act="editGoal">延長期限</button>。`;
+    else line = `接下來每天餐飲 ${money(o.budget)} 以內，就能在 ${short(g.deadline)} 達成`;
+    const daysTxt = o.toDeadline < 0 ? '已到期' : (o.toDeadline === 0 ? '今天到期' : '還剩 ' + (o.toDeadline+1) + ' 天') + '・' + short(g.deadline);
+    top = `<div class="panel">
+      <div class="between"><span style="font-size:15px;font-weight:600">${esc(g.name)}</span><span class="small muted">${daysTxt}</span></div>
+      <div style="display:flex;align-items:baseline;gap:6px;flex-wrap:wrap"><span class="num save" style="font-size:32px;font-weight:700">${money(o.sq)}</span><span class="muted" style="font-size:14px">/ ${money(g.amount)} 已擠出</span></div>
+      <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(pct)}" aria-label="目標進度"><i style="width:${pct}%"></i></div>
+      <p style="font-size:13px;line-height:1.5;color:#3E3E3B">${line}</p></div>`;
+  } else {
+    top = `<div class="panel"><p style="font-weight:600">目前沒有進行中的目標</p><p class="small muted">設一個小目標，每天從吃飯擠出錢來。</p><button class="btn ghost" data-act="newGoal">設定目標</button></div>`;
+  }
+  let miss = '';
+  const y = addDays(t,-1);
+  if (g && !g.done && y >= g.start && y <= g.deadline && !S.entries[y]) {
+    miss = `<div class="card" style="gap:10px"><p style="font-weight:600">昨天（${short(y)}）還沒記</p><p class="small muted">大概跟平常差不多嗎？</p>
+      <div class="split"><button class="btn ghost" style="height:48px;font-size:14px" data-act="quickY">差不多，餐飲 ${money(g.budget)}</button><button class="btn ghost" style="height:48px;font-size:14px" data-act="open" data-d="${y}">自己填</button></div></div>`;
+  }
+  const [yy,mm] = ui.month.split('-').map(Number);
+  const first = new Date(yy, mm-1, 1), dim = new Date(yy, mm, 0).getDate();
+  let cells = WD.map(w=>`<span class="wd">${w}</span>`).join('');
+  for (let i=0;i<first.getDay();i++) cells += '<span></span>';
+  let logged = 0;
+  for (let d=1; d<=dim; d++) {
+    const ds = yy+'-'+pad(mm)+'-'+pad(d), e = S.entries[ds];
+    if (e) logged++;
+    const isT = ds === t, fut = ds > t;
+    const cls = ['cell', e?'has':'', isT?'today':'', fut?'future':''].join(' ');
+    let inner = `<span class="d">${d}</span>`, label = mm+'月'+d+'日';
+    if (e) {
+      const over = (e.food||0) > budgetFor(ds), other = (e.transport||0)+(e.needs||0)+(e.wants||0);
+      inner += `<span class="a" style="color:var(${over?'--food':'--save'})">$${(e.food||0).toLocaleString('en-US')}</span>`;
+      if (other > 0) inner += '<span class="dot"></span>';
+      label += `，餐飲 ${e.food||0} 元${over?'，超過預算':''}${other>0?'，有其他花費 '+other+' 元':''}`;
+    } else if (isT) { inner += '<span class="plus" aria-hidden="true">+</span>'; label += '，今天，還沒記'; }
+    cells += fut ? `<span class="${cls}" aria-label="${label}">${inner}</span>` : `<button class="${cls}" data-act="open" data-d="${ds}" aria-label="${label}">${inner}</button>`;
+  }
+  const canNext = ui.month < t.slice(0,7);
+  return `<div class="screen" style="gap:16px">
+    <div class="top"><span style="font-size:15px;font-weight:700">擠錢記帳</span><button class="iconbtn" data-act="setup1" aria-label="設定與備份">${ICON.gear}</button></div>
+    ${top}${miss}
+    <div class="monthbar"><button class="iconbtn" data-act="prevM" aria-label="上個月">${ICON.back}</button>
+      <div style="text-align:center"><h2>${yy} 年 ${mm} 月</h2><span class="small muted">這個月記了 ${logged} 天</span></div>
+      <button class="iconbtn" data-act="nextM" aria-label="下個月" ${canNext?'':'disabled style="opacity:.3"'}>${ICON.next}</button></div>
+    <div class="cal">${cells}</div>
+    <div class="legend"><span><i class="sw" style="background:var(--save)"></i>餐飲在預算內</span><span><i class="sw" style="background:var(--food)"></i>超過預算</span><span><i class="sw" style="width:6px;height:6px;background:var(--muted)"></i>有其他花費</span></div>
+    <div class="spacer"></div>
+    <button class="btn" data-act="open" data-d="${t}">${ICON.plus}${S.entries[t]?'修改今天':'記今天'}</button>
+  </div>`;
+}
+function ringStyle(hot){
+  const d = ui.draft || {};
+  const col = c => { if (hot && CATS[c].dir === hot) return 'var(--save)'; if (d[c] != null && d[c] !== '') return c === 'food' ? 'var(--foodFill)' : 'var(--fg)'; return 'var(--line)'; };
+  return `border-top-color:${col('food')};border-right-color:${col('transport')};border-bottom-color:${col('needs')};border-left-color:${col('wants')}`;
+}
+function vEntry(){
+  const ds = ui.date, d = ui.draft, b = todayBudget(ds);
+  const catBtn = c => { const v = d[c], has = v != null && v !== ''; return `<button class="cat ${CATS[c].dir}" data-act="cat" data-c="${c}" aria-label="${CATS[c].name}${has?'，'+v+' 元':'，未填'}"><b>${CATS[c].name}</b><span class="${has?'':'empty'}">${has?money(v):'未填'}</span></button>`; };
+  const chev = (dir, l, t) => `<svg class="chev" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="left:${l}px;top:${t}px"><path d="${ICON.chev[dir]}"/></svg>`;
+  const food = num(d.food), other = num(d.transport)+num(d.needs)+num(d.wants);
+  return `<div class="screen" style="gap:14px">
+    <div class="top"><button class="link" data-act="home">${ICON.back}月曆</button><span class="small muted">餐飲預算 ${money(Math.max(b,0))}</span></div>
+    <div style="display:flex;flex-direction:column;gap:6px"><h1>${fmtDate(ds)}</h1><p class="muted" style="font-size:14px">按住中間的圓，往一個方向滑來選類別</p></div>
+    <div class="dialwrap"><div class="dial" id="dial">
+      <div class="ring" id="ring" style="${ringStyle(null)}"></div>
+      ${catBtn('food')}${catBtn('transport')}${catBtn('needs')}${catBtn('wants')}
+      ${chev('up',152,84)}${chev('down',152,220)}${chev('left',84,152)}${chev('right',220,152)}
+      <button class="core" id="core" aria-label="完成，儲存這天的紀錄"><b>完成</b><small>點一下儲存</small></button>
+    </div></div>
+    <div class="between" style="padding:14px 16px;border-radius:14px;background:var(--soft)"><span class="small" style="color:#3E3E3B">這天總共</span>
+      <span class="small" style="color:#3E3E3B">餐飲 <strong class="num" style="color:var(--fg)">${money(food)}</strong>・其他 <strong class="num" style="color:var(--fg)">${money(other)}</strong></span></div>
+    <p class="small muted" style="text-align:center">沒滑到的類別算 $0</p>
+    <div class="spacer"></div>
+    <button class="btn ghost" data-act="zero">這天沒花錢</button>
+  </div>`;
+}
+function amtSub(v){ const b = todayBudget(ui.date), r = b - v; return `預算 ${money(Math.max(b,0))}・${r >= 0 ? '還能花 <strong class="save">'+money(r)+'</strong>' : '超過 <strong class="food">'+money(-r)+'</strong>'}`; }
+function vAmount(){
+  const c = ui.cat, isFood = c === 'food', v = num(ui.amount);
+  const keys = ['1','2','3','4','5','6','7','8','9','00','0','del'].map(k => `<button class="key" data-act="key" data-k="${k}" aria-label="${k==='del'?'刪除':k}">${k==='del'?'⌫':k}</button>`).join('');
+  return `<div class="screen" style="gap:14px">
+    <div class="top"><button class="link" data-act="backEntry">${ICON.back}${short(ui.date)}</button><span></span></div>
+    <div class="amount"><span class="catchip ${isFood?'':'other'}">${CATS[c].name}</span>
+      <span class="amountval" id="amtval" aria-live="polite">${money(v)}</span>
+      <span class="small" style="color:#3E3E3B" id="amtsub">${isFood ? amtSub(v) : ''}</span></div>
+    <div class="spacer"></div>
+    <div class="keys">${keys}</div>
+    <button class="btn" data-act="okAmount">確定</button>
+  </div>`;
+}
+function vDone(){
+  const g = S.history[S.history.length-1] || {};
+  return `<div class="screen">
+    <div class="hero">
+      <div class="check"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+      <div style="display:flex;flex-direction:column;gap:8px"><p class="muted" style="font-size:15px">${esc(g.name)}</p><h1 style="font-size:34px">達成了！</h1></div>
+      <p style="font-size:16px;line-height:1.6;color:#3E3E3B">你在 ${g.days||0} 天裡，從吃飯擠出了<br><strong class="num save" style="font-size:28px">${money(g.squeezed||0)}</strong></p>
+      <div class="stat2"><div><span class="small muted">記了</span><span style="font-size:20px;font-weight:700">${g.logged||0} 天</span></div>
+        <div><span class="small muted">平均每天擠出</span><span class="num" style="font-size:20px;font-weight:700">${money(g.logged ? g.squeezed/g.logged : 0)}</span></div></div>
+    </div>
+    <button class="btn" data-act="newGoal">設定下一個目標</button>
+    <button class="btn text" data-act="home">回到月曆</button>
+  </div>`;
+}
+function render(){
+  const v = ui.view;
+  document.getElementById('app').innerHTML = v==='setup1'?vSetup1(): v==='setup2'?vSetup2(): v==='entry'?vEntry(): v==='amount'?vAmount(): v==='done'?vDone(): vHome();
+  if (v==='setup1') updSetup1();
+  if (v==='setup2') updSetup2();
+  if (v==='entry') bindDial();
+  window.scrollTo(0,0);
+}
+
+/* ---------- dial gestures ---------- */
+function setHot(dir){
+  const ring = document.getElementById('ring'); if (ring) ring.setAttribute('style', ringStyle(dir));
+  document.querySelectorAll('.cat').forEach(b => b.classList.toggle('hot', !!dir && b.classList.contains(dir)));
+}
+function bindDial(){
+  const core = document.getElementById('core'); if (!core) return;
+  let sx=0, sy=0, dir=null, moved=false, active=false;
+  core.addEventListener('pointerdown', e => { active = true; sx = e.clientX; sy = e.clientY; dir = null; moved = false; try { core.setPointerCapture(e.pointerId); } catch(_){} core.classList.add('pressed'); });
+  core.addEventListener('pointermove', e => {
+    if (!active) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy, dist = Math.hypot(dx,dy);
+    if (dist > 10) moved = true;
+    let nd = null;
+    if (dist > 38) nd = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+    if (nd !== dir) { dir = nd; if (dir) haptic('short'); setHot(dir); }
+  });
+  const reset = () => { active = false; core.classList.remove('pressed'); };
+  core.addEventListener('pointerup', () => { if (!active) return; reset(); if (dir) { setHot(null); openAmount(DIR2CAT[dir]); } else if (!moved) finishEntry(); });
+  core.addEventListener('pointercancel', () => { reset(); setHot(null); });
+  core.addEventListener('click', e => { if (e.detail === 0) finishEntry(); });
+}
+function openAmount(c){ ui.cat = c; const v = ui.draft[c]; ui.amount = v ? String(v) : ''; ui.view = 'amount'; render(); }
+function finishEntry(){
+  const d = ui.draft, ds = ui.date;
+  const e = { food:num(d.food), transport:num(d.transport), needs:num(d.needs), wants:num(d.wants) };
+  S.entries[ds] = e; haptic('long');
+  const g = S.goal; let msg = '已記下 ' + short(ds);
+  if (g && !g.done && ds >= g.start && ds <= g.deadline) {
+    const sq = g.usual - e.food;
+    msg += sq >= 0 ? '，擠出 ' + money(sq) : '，多花了 ' + money(-sq) + '，之後幾天會自動調整';
+    if (squeezedOf(g) >= g.amount) {
+      g.done = true;
+      S.history.push({ name:g.name, amount:g.amount, start:g.start, deadline:g.deadline, doneOn:today(), squeezed:squeezedOf(g), logged:loggedIn(g), days:diffDays(g.start, today())+1 });
+      persist(); ui.view = 'done'; render(); setTimeout(()=>haptic('long'), 400); return;
+    }
+  }
+  persist(); ui.view = 'home'; render(); toast(msg);
+}
+
+/* ---------- backup ---------- */
+async function exportBackup(){
+  const text = JSON.stringify(S);
+  const name = '擠錢記帳備份-' + today() + '.json';
+  try {
+    const file = new File([text], name, { type:'application/json' });
+    if (navigator.canShare && navigator.canShare({ files:[file] })) { await navigator.share({ files:[file], title:name }); return; }
+  } catch(e) { if (e && e.name === 'AbortError') return; }
+  try { await navigator.clipboard.writeText(text); toast('備份已複製，貼到備忘錄保存'); return; } catch(e) {}
+  ui.backup = true; render();
+}
+document.getElementById('importFile').addEventListener('change', async e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  try {
+    const data = JSON.parse(await f.text());
+    if (!data || !data.entries || !data.setup) throw new Error('bad');
+    S = data; persist(); ui.view = S.goal ? 'home' : 'setup1'; render(); toast('已匯入備份');
+  } catch(err) { toast('這個檔案不是擠錢記帳的備份'); }
+  e.target.value = '';
+});
+
+/* ---------- events ---------- */
+document.addEventListener('input', e => {
+  const t = e.target, k = t.dataset.in; if (!k) return;
+  const s = S.setup, i = Number(t.dataset.i);
+  if (k==='income') s.income = t.value;
+  else if (k==='foodm') s.foodMonthly = t.value;
+  else if (k==='dname') s.deductions[i].name = t.value;
+  else if (k==='damount') s.deductions[i].amount = t.value;
+  else if (k==='gname') ui.gd.name = t.value;
+  else if (k==='gamt') ui.gd.amount = t.value;
+  else if (k==='gdate') ui.gd.deadline = t.value;
+  else if (k==='gusual') ui.gd.usual = t.value;
+  if (ui.view==='setup1') { updSetup1(); persist(); }
+  if (ui.view==='setup2') updSetup2();
+});
+function goalDraft(isNew){
+  const g = S.goal;
+  if (!isNew && g && !g.done) return { name:g.name, amount:String(g.amount), deadline:g.deadline, usual:String(g.usual), start:g.start, isNew:false };
+  return { name:'', amount:'', deadline:nextFriday(), usual:String(usualFromSetup() || ''), start:today(), isNew:true };
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+  const a = b.dataset.act;
+  switch (a) {
+    case 'home': ui.view='home'; render(); break;
+    case 'setup1': ui.backup = false; ui.view='setup1'; render(); break;
+    case 'addrow': S.setup.deductions.push({name:'',amount:''}); render(); { const n = document.getElementById('dn'+(S.setup.deductions.length-1)); if (n) n.focus(); } break;
+    case 'delrow': S.setup.deductions.splice(Number(b.dataset.i),1); persist(); render(); break;
+    case 'toSetup2': persist(); ui.gd = goalDraft(!S.goal || S.goal.done); ui.view='setup2'; render(); break;
+    case 'preset': ui.gd.deadline = b.dataset.d; document.getElementById('gdate').value = b.dataset.d; updSetup2(); break;
+    case 'startGoal': {
+      const gd = ui.gd;
+      const g = { name:String(gd.name).trim(), amount:num(gd.amount), deadline:gd.deadline, usual:num(gd.usual), start:gd.start || today(), done:false };
+      g.budget = plan(g).budget;
+      S.goal = g; persist(); haptic('long'); ui.view='home'; ui.month = today().slice(0,7); render(); toast(gd.isNew ? '開始囉！每天記一下就好' : '目標已更新'); break; }
+    case 'newGoal': ui.gd = goalDraft(true); ui.view='setup2'; render(); break;
+    case 'editGoal': ui.gd = goalDraft(false); ui.view='setup2'; render(); break;
+    case 'prevM': { const [y,m] = ui.month.split('-').map(Number); const d = new Date(y, m-2, 1); ui.month = d.getFullYear()+'-'+pad(d.getMonth()+1); render(); break; }
+    case 'nextM': { const [y,m] = ui.month.split('-').map(Number); const d = new Date(y, m, 1); const nm = d.getFullYear()+'-'+pad(d.getMonth()+1); if (nm <= today().slice(0,7)) { ui.month = nm; render(); } break; }
+    case 'open': { const ds = b.dataset.d; ui.date = ds; const e0 = S.entries[ds]; ui.draft = e0 ? { food:e0.food||0, transport:e0.transport||0, needs:e0.needs||0, wants:e0.wants||0 } : {}; ui.view='entry'; render(); break; }
+    case 'quickY': { const y = addDays(today(),-1); S.entries[y] = { food:S.goal.budget, transport:0, needs:0, wants:0, quick:true }; haptic('short'); persist(); render(); toast('已補記 '+short(y)); break; }
+    case 'cat': haptic('short'); openAmount(b.dataset.c); break;
+    case 'zero': ui.draft = { food:0, transport:0, needs:0, wants:0 }; finishEntry(); break;
+    case 'key': {
+      const k = b.dataset.k; let s = ui.amount;
+      if (k==='del') s = s.slice(0,-1); else if (s.length < 7) s = (s==='0' ? '' : s) + k;
+      ui.amount = s.replace(/^0+(?=\d)/,''); haptic('short');
+      const v = num(ui.amount); document.getElementById('amtval').textContent = money(v);
+      if (ui.cat === 'food') document.getElementById('amtsub').innerHTML = amtSub(v);
+      break; }
+    case 'okAmount': ui.draft[ui.cat] = num(ui.amount); haptic('short'); ui.view='entry'; render(); break;
+    case 'backEntry': ui.view='entry'; render(); break;
+    case 'export': exportBackup(); break;
+    case 'import': document.getElementById('importFile').click(); break;
+  }
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden && ui.view === 'home') render(); });
+
+render();
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+})();
+</script>
+</body>
+</html>
